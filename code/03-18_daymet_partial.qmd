@@ -36,7 +36,7 @@ library(daymetr)
 ```
 
 ```{r}
-field 
+field <- read_csv("../data/cotton_fielddata.csv")
 
 field
 ```
@@ -60,24 +60,36 @@ summary(field)
 How many unique years?  
 
 ```{r unique years}
-
+uyear <-length(unique(field$year))
+uyear
 ```
 
 41 distinct years in the data set.  
 
 Now, how many unique sites?
 ```{r unique sites}
-
+field %>%
+  distinct(site) %>%
+  nrow()
 ```
 
 65 unique sites.  
 
 What is the statistical distribution of fiber strength?  
 ```{r fiber strength}
-
+ggplot(data = field) + 
+  geom_density(aes(x = strength_gtex)) + 
+  geom_rug(aes(x = strength_gtex))
 ```
 
-```{r}
+```{r Map of US}
+states <- us_states() %>% # %in% means == for multiple values/ conditions
+  filter(!(state_abbr %in% c("PR", "AK", "HI"))) #! excludes PR, AK, and HI
+ggplot() +
+  geom_sf(data = states) +
+  geom_point(data = field,
+             aes(x = lon,
+                 y = lat))
 
 ```
 
@@ -120,7 +132,13 @@ Let's try it with the first site-year on the data frame.
 ```{r one site-year}
 field
 
-daymet_one 
+daymet_one <- download_daymet(site = field$site[[1]],
+                              lat = field$lat[[1]],
+                              lon = field$lon[[1]],
+                              start = field$year[[1]],
+                              end = field$year[[1]],
+                              simplify = T
+                              )
 
 daymet_one
 ```
@@ -128,7 +146,11 @@ daymet_one
 How many rows above? Why?  
 
 ```{r}
-daymet_one 
+
+daymet_one %>%
+  pivot_wider(names_from = measurement,
+              values_from = value)
+
 ```
 How many rows above? Why?  
 
@@ -142,7 +164,25 @@ For that, let's use the **map()** family of functions from the purrr package.
 **WARNING**: the chunk below took about **3 minutes** to run on my laptop.  
 
 ```{r}
-daymet_all 
+
+
+daymet_all <- field %>%
+  mutate(weather = pmap(list(.y = year,
+                            .site = site,
+                            .lat = lat,
+                            .lon = lon),
+                       function(.y, .site,.lat,.lon)
+                         download_daymet(
+                           site = .site,
+                           lat = .lat,
+                           lon = .lon,
+                           start = .y,
+                           end = .y,
+                           simplify = T,
+                           silent = T) %>%
+                         rename(.year = year,
+                                .site = site)
+                       ))
 
 ```
 
